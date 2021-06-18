@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useHistory } from "react-router-dom";
 import changePokemon from "../../Contexts/ChangePokemon";
-import { getPokemons } from "../../api.js";
+import { getPokemon, getByUrl } from "../../api.js";
 import Card from "../../Components/Card";
 import Loading from "../../Components/Loading";
 import { GridArea } from "../../Components/UI";
@@ -13,30 +13,28 @@ const Home = () => {
   const [initialLoading, setInitialLoading] = useState(true);
   const [nextURL, setNextURL] = useState("");
   const [prevURL, setPrevURL] = useState("");
-  const initialURL = "https://pokeapi.co/api/v2/pokemon/";
-
   const change = useContext(changePokemon);
 
   useEffect(() => {
     const fetchPrev = async () => {
       if (prevURL) {
         setLoading(true);
-        let data = await getPokemons(prevURL);
-        loadPokemon(data.results);
+        let response = await getByUrl(prevURL, history);
+        loadPokemon(response.results);
         change.setPrevPokemon({
           url: true,
-          pokemon: data.previous,
+          pokemon: response.previous,
         });
         change.setNextPokemon({
           url: true,
-          pokemon: data.next,
+          pokemon: response.next,
         });
-        setNextURL(data.next);
-        setPrevURL(data.previous);
+        setNextURL(response.next);
+        setPrevURL(response.previous);
         setLoading(false);
 
         return () => {
-          data.unsubscribe();
+          response.unsubscribe();
         };
       }
     };
@@ -49,22 +47,22 @@ const Home = () => {
     const fetchNext = async () => {
       if (nextURL) {
         setLoading(true);
-        let data = await getPokemons(nextURL);
-        loadPokemon(data.results);
+        let response = await getByUrl(nextURL, history);
+        loadPokemon(response.results);
         change.setPrevPokemon({
           url: true,
-          pokemon: data.previous,
+          pokemon: response.previous,
         });
         change.setNextPokemon({
           url: true,
-          pokemon: data.next,
+          pokemon: response.next,
         });
-        setNextURL(data.next);
-        setPrevURL(data.previous);
+        setNextURL(response.next);
+        setPrevURL(response.previous);
         setLoading(false);
 
         return () => {
-          data.unsubscribe();
+          response.unsubscribe();
         };
       }
     };
@@ -75,31 +73,32 @@ const Home = () => {
 
   const fetchInitial = async () => {
     setInitialLoading(false);
-    await getPokemons(initialURL, history).then((response) => {
-      setNextURL(response.next);
-      setPrevURL(response.previous);
-      change.setPrevPokemon({
-        url: true,
-        pokemon: response.previous,
-      });
-      change.setNextPokemon({
-        url: true,
-        pokemon: response.next,
-      });
-      loadPokemon(response.results);
+    const response = await getPokemon("", history);
+    setPrevURL(response.previous);
+    setNextURL(response.next);
+    change.setPrevPokemon({
+      url: true,
+      pokemon: response.previous,
     });
+    change.setNextPokemon({
+      url: true,
+      pokemon: response.next,
+    });
+    loadPokemon(response.results);
+    return () => {
+      response.unsubscribe();
+    };
   };
 
   const loadPokemon = async (data) => {
-    let _pokemons = await Promise.all(
+    let response = await Promise.all(
       data.map(async (pokemon) => {
-        let pokemonRecord = await getPokemons(pokemon.url);
-        return pokemonRecord;
+        return await getByUrl(pokemon.url);
       })
     );
-    setPokemons(_pokemons);
+    setPokemons(response);
     return () => {
-      _pokemons.unsubscribe();
+      response.unsubscribe();
     };
   };
 

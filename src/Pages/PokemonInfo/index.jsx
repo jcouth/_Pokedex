@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useContext } from "react";
 import { useParams, useHistory } from "react-router-dom";
-import { getPokemons } from "../../api.js";
+import {
+  getPokemon,
+  getEvolutions,
+  getByUrl,
+  getWeaknesses,
+} from "../../api.js";
 import EvolutionCard from "../../Components/EvolutionCard";
 import Loading from "../../Components/Loading";
 import changePokemon from "../../Contexts/ChangePokemon.js";
@@ -34,81 +39,47 @@ const PokemonInfo = () => {
   const [loadingEvolution, setLoadingEvolution] = useState(true);
   const [evolutions, setEvolutions] = useState([]);
   const [weaknesses, setWeaknesses] = useState([]);
-  const initialURL = "https://pokeapi.co/api/v2/";
 
   const change = useContext(changePokemon);
 
   useEffect(() => {
     const fetchInitial = async () => {
-      let responseData = await getPokemons(
-        initialURL + "pokemon/" + name,
+      let responsePokemon = await getPokemon(name, history);
+      let responseSpecie = await getByUrl(responsePokemon.species.url, history);
+      let responseEvolutions = await getEvolutions(
+        responseSpecie.evolution_chain.url,
+        responsePokemon,
         history
       );
-      let responseSpecie = await getPokemons(responseData.species.url, history);
-      fetchWeaknesses(responseData.types[0].type.url);
+      let responseWeaknesses = await getWeaknesses(
+        responsePokemon.types[0].type.url,
+        history
+      );
       setPokemon({
-        data: responseData,
+        data: responsePokemon,
         category: responseSpecie.genera[7],
       });
       change.setPrevPokemon({
         url: false,
-        pokemon: parseInt(responseData.id) - 1,
+        pokemon: parseInt(responsePokemon.id) - 1,
       });
       change.setNextPokemon({
         url: false,
-        pokemon: parseInt(responseData.id) + 1,
+        pokemon: parseInt(responsePokemon.id) + 1,
       });
-      fetchEvolutions(responseData, responseSpecie.evolution_chain.url);
+      setWeaknesses(responseWeaknesses);
+      setEvolutions(responseEvolutions);
+      setLoadingEvolution(false);
       setLoading(false);
 
       return () => {
-        responseData.unsubscribe();
-        responseSpecie.unsubscribe();
-      };
-    };
-
-    const fetchEvolutions = async (pokemon, url) => {
-      let responseEvolution = await getPokemons(url, history);
-      let evolutionsData = [];
-      let chain = responseEvolution.chain;
-      let pokemonData = pokemon;
-      let specieData;
-      do {
-        if (chain.species.name !== pokemon.name) {
-          specieData = await getPokemons(chain.species.url, history);
-          pokemonData = await getPokemons(
-            initialURL + "pokemon/" + specieData.id,
-            history
-          );
-        }
-        evolutionsData.push(pokemonData);
-        chain = chain["evolves_to"][0];
-        pokemonData = pokemon;
-      } while (!!chain && chain.hasOwnProperty("evolves_to"));
-      setEvolutions(evolutionsData);
-      setLoadingEvolution(false);
-
-      return () => {
-        responseEvolution.unsubscribe();
-        specieData.unsubscribe();
-        pokemonData.unsubscribe();
-      };
-    };
-
-    const fetchWeaknesses = async (url) => {
-      let responseWeaknesses = await getPokemons(url, history);
-      let weaknessesData = [];
-      responseWeaknesses.damage_relations.double_damage_from.forEach(
-        (weakness) => {
-          weaknessesData.push(weakness.name);
-        }
-      );
-      setWeaknesses(weaknessesData);
-
-      return () => {
         responseWeaknesses.unsubscribe();
+        responseEvolutions.unsubscribe();
+        responseSpecie.unsubscribe();
+        responsePokemon.unsubscribe();
       };
     };
+
     setLoading(true);
     setLoadingEvolution(true);
     fetchInitial();
@@ -118,47 +89,34 @@ const PokemonInfo = () => {
   useEffect(() => {
     const fetchPrev = async () => {
       if (1 < pokemon.data.id) {
-        let responseData = await getPokemons(
-          initialURL + "pokemon/" + (parseInt(pokemon.data.id) - 1),
+        let responsePokemon = await getPokemon(
+          parseInt(pokemon.data.id) - 1,
           history
         );
-        let responseSpecie = await getPokemons(
-          responseData.species.url,
+        let responseSpecie = await getByUrl(
+          responsePokemon.species.url,
           history
         );
-        fetchEvolutions(responseData, responseSpecie.evolution_chain.url);
+        let responseEvolutions = await getEvolutions(
+          responseSpecie.evolution_chain.url,
+          responsePokemon,
+          history
+        );
         setPokemon({
-          data: responseData,
+          data: responsePokemon,
           flavor_text: responseSpecie.flavor_text_entries[0].flavor_text,
           category: responseSpecie.genera[7],
         });
+        setEvolutions(responseEvolutions);
+        setLoadingEvolution(false);
         setLoading(false);
 
         return () => {
-          responseData.unsubscribe();
+          responseEvolutions.unsubscribe();
           responseSpecie.unsubscribe();
+          responsePokemon.unsubscribe();
         };
       }
-    };
-
-    const fetchEvolutions = async (pokemon, url) => {
-      let responseEvolution = await getPokemons(url, history);
-      let evolutionsData = [];
-      let chain = responseEvolution.chain;
-      do {
-        let pokemonData = pokemon;
-        if (chain.species.name !== pokemon.name) {
-          let specieData = await getPokemons(chain.species.url, history);
-          pokemonData = await getPokemons(
-            initialURL + "pokemon/" + specieData.id,
-            history
-          );
-        }
-        evolutionsData.push(pokemonData);
-        chain = chain["evolves_to"][0];
-      } while (!!chain && chain.hasOwnProperty("evolves_to"));
-      setEvolutions(evolutionsData);
-      setLoadingEvolution(false);
     };
 
     if (pokemon) {
@@ -171,37 +129,29 @@ const PokemonInfo = () => {
 
   useEffect(() => {
     const fetchNext = async () => {
-      let responseData = await getPokemons(
-        initialURL + "pokemon/" + (parseInt(pokemon.data.id) + 1),
+      let responsePokemon = await getPokemon(
+        parseInt(pokemon.data.id) - 1,
         history
       );
-      let responseSpecie = await getPokemons(responseData.species.url, history);
-      fetchEvolutions(responseData, responseSpecie.evolution_chain.url);
+      let responseSpecie = await getByUrl(responsePokemon.species.url, history);
+      let responseEvolutions = await getEvolutions(
+        responseSpecie.evolution_chain.url,
+        responsePokemon,
+        history
+      );
       setPokemon({
-        data: responseData,
+        data: responsePokemon,
         category: responseSpecie.genera[7],
       });
-      setLoading(false);
-    };
-
-    const fetchEvolutions = async (pokemon, url) => {
-      let responseEvolution = await getPokemons(url, history);
-      let evolutionsData = [];
-      let chain = responseEvolution.chain;
-      do {
-        let pokemonData = pokemon;
-        if (chain.species.name !== pokemon.name) {
-          let specieData = await getPokemons(chain.species.url, history);
-          pokemonData = await getPokemons(
-            initialURL + "pokemon/" + specieData.id,
-            history
-          );
-        }
-        evolutionsData.push(pokemonData);
-        chain = chain["evolves_to"][0];
-      } while (!!chain && chain.hasOwnProperty("evolves_to"));
-      setEvolutions(evolutionsData);
+      setEvolutions(responseEvolutions);
       setLoadingEvolution(false);
+      setLoading(false);
+
+      return () => {
+        responseEvolutions.unsubscribe();
+        responseSpecie.unsubscribe();
+        responsePokemon.unsubscribe();
+      };
     };
 
     if (pokemon) {

@@ -1,26 +1,45 @@
-export const getPokemons = async (url, history) => {
-  return new Promise((resolve, reject) => {
-    fetch(url)
-      .then((response) => response.json())
-      .then((data) => {
-        resolve(data);
-      })
-      .catch((e) => {
-        history.push("/404");
-      });
-  });
+import axios from "axios";
+
+const apiURL = "https://pokeapi.co/api/v2";
+
+export const getPokemon = async (pokemon, history) => {
+  return getByUrl(`${apiURL}/pokemon/${pokemon}`, history);
 };
 
-// export const api = axios.create({
-//   baseURL: "https://pokeapi.co/api/v2/",
-// });
+export const getByUrl = async (url, history) => {
+  return await axios
+    .get(url)
+    .then((response) => response.data)
+    .catch(() => {
+      history.push("/404");
+    });
+};
 
-// export const getPokemonasfd = async(pokemon, setPokemon) => {
-//   const response = await api.get(`pokemon/${pokemon}`);
-//   setPokemon(response);
-// }
+export const getEvolutions = async (url, pokemon, history) => {
+  let responseEvolution = await getByUrl(url, history);
+  let responsePokemon = pokemon;
+  let responseSpecie;
+  let chain = responseEvolution.chain;
+  let evolutionsData = [];
+  do {
+    if (chain.species.name !== pokemon.name) {
+      responseSpecie = await getByUrl(chain.species.url, history);
+      responsePokemon = await getPokemon(responseSpecie.id, history);
+    }
+    evolutionsData.push(responsePokemon);
+    chain = chain["evolves_to"][0];
+    responsePokemon = pokemon;
+  } while (!!chain && chain.hasOwnProperty("evolves_to"));
+  return evolutionsData;
+}
 
-// export const getPokemonsdfsf = async(pokemonName, setPokemon) => {
-//   const response = await api.get(`pokemon/${pokemonName}`);
-//   setPokemon(response);
-// }
+export const getWeaknesses = async (url, history) => {
+  let responseWeaknesses = await getByUrl(url, history);
+  let weaknessesData = [];
+  responseWeaknesses.damage_relations.double_damage_from.forEach(
+    (weakness) => {
+      weaknessesData.push(weakness.name);
+    }
+  );
+  return weaknessesData;
+}
