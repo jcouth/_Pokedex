@@ -9,6 +9,7 @@ const PokedexSearch = () => {
   const [pokemonInput, setPokemonInput] = useState("");
   const change = useContext(changePokemon);
   const history = useHistory();
+  // teste
   let searchInput = useRef();
 
   const handleKeyUpSearch = (e) => {
